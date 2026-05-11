@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RecSys Engine — AIE425</title>
+    <meta name="description" content="AIE425 Intelligent E-Commerce Recommendation System">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="aurora"></div>
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-box">
+            <div class="spinner"></div>
+            <p id="loadingText" style="margin-top:0.5rem;color:#a0a0c8;">Loading...</p>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-logo">🛒 RecSys Engine</div>
+            <div class="sidebar-subtitle">AIE425 · Intelligent Recommender</div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Navigation</div>
+                <a class="nav-item active" onclick="showPage('home')" id="nav-home"><i class="fas fa-home"></i> Home & Overview</a>
+                <a class="nav-item" onclick="showPage('cf')" id="nav-cf"><i class="fas fa-users"></i> Collaborative Filtering</a>
+                <a class="nav-item" onclick="showPage('cb')" id="nav-cb"><i class="fas fa-file-alt"></i> Content-Based</a>
+                <a class="nav-item" onclick="showPage('kb')" id="nav-kb"><i class="fas fa-bullseye"></i> Knowledge-Based</a>
+                <a class="nav-item" onclick="showPage('eval')" id="nav-eval"><i class="fas fa-chart-bar"></i> Evaluation</a>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">User Settings</div>
+                <div class="control-group">
+                    <label class="control-label">Select User</label>
+                    <select id="userSelect" onchange="onUserChange()">
+                        {% for uid in user_ids %}<option value="{{ uid }}">User {{ uid }}</option>{% endfor %}
+                    </select>
+                    <div class="user-stats" id="userStats"></div>
+                </div>
+                <div class="control-group">
+                    <label class="control-label">Top-N Results</label>
+                    <input type="number" id="topN" value="10" min="3" max="20">
+                </div>
+            </div>
+
+            <div style="margin-top:auto;padding-top:2rem;text-align:center;">
+                <div style="font-size:0.68rem;color:var(--text-muted);">Intelligent Recommender System<br>AIE425 Course Project</div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <!-- HOME -->
+            <div class="page active" id="page-home">
+                <div class="page-header">
+                    <h1>🛒 Intelligent E-Commerce Recommendation System</h1>
+                    <p>Personalized product recommendations using CF, Content-Based, and Knowledge-Based approaches</p>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="stat-value" data-count="{{ n_products }}">0</div><div class="stat-label">Products</div></div>
+                    <div class="stat-card"><div class="stat-value" data-count="{{ n_users }}">0</div><div class="stat-label">Users</div></div>
+                    <div class="stat-card"><div class="stat-value" data-count="{{ n_ratings_raw }}">0</div><div class="stat-label">Ratings</div></div>
+                    <div class="stat-card"><div class="stat-value">{{ avg_rating }}</div><div class="stat-label">Avg Rating</div></div>
+                </div>
+
+                <h2 class="section-title"><i class="fas fa-brain"></i> Three Recommendation Approaches</h2>
+                <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="approach-card" onclick="showPage('cf')">
+                        <span class="card-icon">🤝</span>
+                        <h3>Collaborative Filtering</h3>
+                        <p>Finds users with similar tastes and recommends what they liked. Implements <strong>4 methods</strong>: User-Based (Cosine & Pearson), Item-Based, SVD.</p>
+                        <span class="card-tag">4 Methods</span>
+                    </div>
+                    <div class="approach-card" onclick="showPage('cb')">
+                        <span class="card-icon">📝</span>
+                        <h3>Content-Based</h3>
+                        <p>Analyzes product features (descriptions, categories, brands) using <strong>TF-IDF</strong> to find items similar to what you've enjoyed.</p>
+                        <span class="card-tag">TF-IDF</span>
+                    </div>
+                    <div class="approach-card" onclick="showPage('kb')">
+                        <span class="card-icon">🎯</span>
+                        <h3>Knowledge-Based</h3>
+                        <p>Applies your explicit constraints — budget, brand, category, minimum rating — to filter and rank products intelligently.</p>
+                        <span class="card-tag">Constraint-Based</span>
+                    </div>
+                </div>
+
+                <h2 class="section-title" style="margin-top:2rem;"><i class="fas fa-chart-pie"></i> Dataset Exploration</h2>
+                <div class="tab-bar">
+                    <button class="tab-btn active" onclick="switchTab(this,'home-tab-cat')">📦 Categories</button>
+                    <button class="tab-btn" onclick="switchTab(this,'home-tab-ratings')">⭐ Ratings</button>
+                </div>
+                <div class="tab-panel active" id="home-tab-cat"><div class="chart-container"><canvas id="catChart" height="300"></canvas></div></div>
+                <div class="tab-panel" id="home-tab-ratings"><div class="chart-container"><canvas id="ratingChart" height="300"></canvas></div></div>
+            </div>
+
+            <!-- CF -->
+            <div class="page" id="page-cf">
+                <div class="page-header"><h1>🤝 Collaborative Filtering</h1><p>Find similar users or items to generate personalized recommendations</p></div>
+                <div class="control-group" style="margin-bottom:1.5rem;">
+                    <label class="control-label">CF Method</label>
+                    <select id="cfMethod" style="max-width:400px;">
+                        <option value="user_cosine">User-Based CF (Cosine Similarity)</option>
+                        <option value="user_pearson">User-Based CF (Pearson Correlation)</option>
+                        <option value="item_cosine">Item-Based CF (Cosine Similarity)</option>
+                        <option value="svd">Matrix Factorization (SVD)</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="getCFRecommendations()"><i class="fas fa-magic"></i> Get Recommendations</button>
+                <button class="btn btn-secondary" onclick="compareCFMethods()" style="margin-left:0.5rem;"><i class="fas fa-columns"></i> Compare All 4 Methods</button>
+                <div id="cfResults" style="margin-top:1.5rem;"></div>
+                <div id="cfComparison" style="margin-top:1.5rem;"></div>
+            </div>
+
+            <!-- CB -->
+            <div class="page" id="page-cb">
+                <div class="page-header"><h1>📝 Content-Based Recommendation</h1><p>Recommend products similar to what you've enjoyed using TF-IDF analysis</p></div>
+                <button class="btn btn-primary" onclick="getCBRecommendations()"><i class="fas fa-magic"></i> Get Recommendations</button>
+                <div id="cbResults" style="margin-top:1.5rem;"></div>
+            </div>
+
+            <!-- KB -->
+            <div class="page" id="page-kb">
+                <div class="page-header"><h1>🎯 Knowledge-Based Recommendation</h1><p>Set your requirements and constraints to find the perfect products</p></div>
+                <h2 class="section-title"><i class="fas fa-sliders-h"></i> Set Your Constraints</h2>
+                <div class="filter-grid">
+                    <div class="control-group"><label class="control-label">📂 Category</label><select id="kbCategory"><option value="">All Categories</option>{% for cat in categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}</select></div>
+                    <div class="control-group"><label class="control-label">🏷️ Brand</label><select id="kbBrand"><option value="">All Brands</option>{% for brand in brands %}<option value="{{ brand }}">{{ brand }}</option>{% endfor %}</select></div>
+                    <div class="control-group"><label class="control-label">💰 Min Price ($)</label><input type="number" id="kbMinPrice" value="{{ min_price }}" min="{{ min_price }}" step="5"></div>
+                    <div class="control-group"><label class="control-label">💰 Max Price ($)</label><input type="number" id="kbMaxPrice" value="{{ max_price }}" max="{{ max_price }}" step="5"></div>
+                    <div class="control-group"><label class="control-label">⭐ Min Rating</label><input type="number" id="kbMinRating" value="3" min="1" max="5" step="0.5"></div>
+                </div>
+                <button class="btn btn-primary" onclick="getKBRecommendations()"><i class="fas fa-filter"></i> Apply Filters & Recommend</button>
+                <div id="kbResults" style="margin-top:1.5rem;"></div>
+            </div>
+
+            <!-- EVAL -->
+            <div class="page" id="page-eval">
+                <div class="page-header"><h1>📊 Evaluation & Comparison Dashboard</h1><p>Comprehensive analysis using Precision@K, Recall@K, RMSE, and NDCG@K</p></div>
+                <div class="control-group" style="margin-bottom:1.5rem;">
+                    <label class="control-label">Evaluation K (Top-K)</label>
+                    <input type="number" id="evalK" value="10" min="3" max="20" style="max-width:120px;">
+                </div>
+                <button class="btn btn-primary" id="evalBtn" onclick="runEvaluation()"><i class="fas fa-rocket"></i> Run Full Evaluation</button>
+                <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem;">⏱️ Evaluates all methods across test users — may take a minute.</p>
+                <div id="evalResults" style="margin-top:1.5rem;"></div>
+            </div>
+
+            <div class="footer">Intelligent Recommender System — AIE425 — Built with Flask & Chart.js</div>
+        </main>
+    </div>
+
+    <script src="/static/script.js"></script>
+    <script>
+        const catData = {{ cat_data | tojson }};
+        const ratingData = {{ rating_data | tojson }};
+        initHomeCharts(catData, ratingData);
+        onUserChange();
+        animateCounters();
+    </script>
+</body>
+</html>
