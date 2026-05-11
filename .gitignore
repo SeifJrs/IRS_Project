@@ -3,3 +3,6 @@ __pycache__/
 *.pyo
 data/preprocessed/
 .streamlit/
+frontend/.next/
+frontend/node_modules/
+.codex-run/
